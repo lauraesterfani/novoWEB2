@@ -15,6 +15,13 @@ class BorrowingController extends Controller
             'user_id' => 'required|exists:users,id',
         ]);
 
+        $user = User::findOrFail($request->user_id);
+
+        if ($user->debit > 0) {
+            return redirect()->route('books.show', $book)
+                             ->with('error', 'Usuário possui débito pendente e não pode realizar novos empréstimos.');
+        }
+
         $openBorrowing = Borrowing::where('book_id', $book->id)
                                   ->whereNull('returned_at')
                                   ->first();
@@ -24,7 +31,7 @@ class BorrowingController extends Controller
                              ->with('error', 'Este livro já está emprestado e não foi devolvido.');
         }
 
-        $openBorrowingsCount = Borrowing::where('user_id', $request->user_id)
+        $openBorrowingsCount = Borrowing::where('user_id', $user->id)
                                        ->whereNull('returned_at')
                                        ->count();
 
@@ -34,7 +41,7 @@ class BorrowingController extends Controller
         }
 
         Borrowing::create([
-            'user_id' => $request->user_id,
+            'user_id' => $user->id,
             'book_id' => $book->id,
             'borrowed_at' => now(),
         ]);
@@ -44,11 +51,31 @@ class BorrowingController extends Controller
 
     public function returnBook(Borrowing $borrowing)
     {
+        $now = now();
+        $borrowedAt = $borrowing->borrowed_at;
+        $dueDate = $borrowedAt->copy()->addDays(15);
+
+        $lateDays = $now->diffInDays($dueDate, false);
+
+        if ($lateDays < 0) {
+            $fine = abs($lateDays) * 0.50;
+
+            $user = $borrowing->user;
+            $user->debit += $fine;
+            $user->save();
+        }
+
         $borrowing->update([
-            'returned_at' => now(),
+            'returned_at' => $now,
         ]);
 
-        return redirect()->route('books.show', $borrowing->book_id)->with('success', 'Devolução registrada com sucesso.');
+        $message = 'Devolução registrada com sucesso.';
+        if (isset($fine) && $fine > 0) {
+            $message .= " Multa de R$ " . number_format($fine, 2) . " aplicada.";
+        }
+
+        return redirect()->route('books.show', $borrowing->book_id)
+                         ->with('success', $message);
     }
 
     public function userBorrowings(User $user)

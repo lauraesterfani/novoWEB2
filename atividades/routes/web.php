@@ -7,12 +7,17 @@ use App\Http\Controllers\PublisherController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\BorrowingController;
+use App\Http\Controllers\DebitController;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Support\Facades\Auth;
 
 Route::middleware(['auth', RoleMiddleware::class . ':admin,bibliotecario'])->group(function () {
     Route::post('/books/{book}/borrow', [BorrowingController::class, 'store'])->name('books.borrow');
     Route::patch('/borrowings/{borrowing}/return', [BorrowingController::class, 'returnBook'])->name('borrowings.return');
+
+    // Rotas para controle de débitos (bibliotecário)
+    Route::get('/debitos', [DebitController::class, 'index'])->name('debitos.index');
+    Route::post('/debitos/{user}/clear', [DebitController::class, 'clear'])->name('debitos.clear');
 });
 
 Route::middleware(['auth'])->group(function () {
