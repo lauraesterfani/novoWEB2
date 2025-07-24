@@ -15,7 +15,6 @@ class BorrowingController extends Controller
             'user_id' => 'required|exists:users,id',
         ]);
 
-        // Verifica se já existe empréstimo aberto para esse livro
         $openBorrowing = Borrowing::where('book_id', $book->id)
                                   ->whereNull('returned_at')
                                   ->first();
@@ -23,6 +22,15 @@ class BorrowingController extends Controller
         if ($openBorrowing) {
             return redirect()->route('books.show', $book)
                              ->with('error', 'Este livro já está emprestado e não foi devolvido.');
+        }
+
+        $openBorrowingsCount = Borrowing::where('user_id', $request->user_id)
+                                       ->whereNull('returned_at')
+                                       ->count();
+
+        if ($openBorrowingsCount >= 5) {
+            return redirect()->route('books.show', $book)
+                             ->with('error', 'O usuário já possui 5 livros emprestados. Limite atingido.');
         }
 
         Borrowing::create([
